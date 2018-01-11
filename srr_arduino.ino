@@ -17,13 +17,10 @@ void setup()
   pinMode(echoPin, INPUT);                            // Echo pin set to input
   
   attachInterrupt(intID, echo_interrupt, CHANGE);  // Attach interrupt to the sensor echo input
+
+  Serial.begin(9600);
 }
 
-// ----------------------------------
-// loop() Runs continuously in a loop.
-// This is the background routine where most of the processing usualy takes place.
-// Non time critical tasks should be run from here.
-// ----------------------------------
 void loop()
 {
   int lastRead;
@@ -33,12 +30,20 @@ void loop()
     delay(30); // wait 30 ms to make sure echo is back
     
     if (echo_duration != lastRead)
+    {
       values[i] = echo_duration;
+      lastRead = echo_duration;
+    }
     else // did not receive new pulse
       values[i] = -1;
-
-    lastRead = echo_duration;
   }
+  
+  for (int i = 0; i < 8; ++i)
+  {
+    Serial.print(values[i]);
+    Serial.print("\t");
+  }
+  Serial.print("\n");
 }
 
 
@@ -49,13 +54,6 @@ void trigger_pulse(int pin)
   digitalWrite(pin, LOW);
 }
 
-// --------------------------
-// echo_interrupt() External interrupt from HC-SR04 echo signal. 
-// Called every time the echo signal changes state.
-//
-// Note: this routine does not handle the case where the timer
-//       counter overflows which will result in the occassional error.
-// --------------------------
 void echo_interrupt()
 {
   switch (digitalRead(echoPin))                     // Test to see if the signal is high or low
