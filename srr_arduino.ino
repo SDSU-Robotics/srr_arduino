@@ -8,6 +8,7 @@ volatile long echo_end = 0;                           // Records end of echo pul
 volatile long echo_duration = 0;                      // Duration - difference between end and start
 
 unsigned int values[8];
+int lastRead;
 
 void setup() 
 {
@@ -23,11 +24,10 @@ void setup()
 
 void loop()
 {
-  int lastRead;
-  for (int i = 0; i < 8; ++i)
+  for (int i = 0; i < 8; i++)
   {
     trigger_pulse(trigPins[i]);
-    delay(30); // wait 30 ms to make sure echo is back
+    delay(15); // wait 15 ms to make sure echo is back
     
     if (echo_duration != lastRead)
     {
@@ -38,7 +38,7 @@ void loop()
       values[i] = -1;
   }
   
-  for (int i = 0; i < 8; ++i)
+  for (int i = 0; i < 8; i++)
   {
     Serial.print(values[i]);
     Serial.print("\t");
