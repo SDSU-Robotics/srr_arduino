@@ -1,3 +1,16 @@
+#include <ros.h>
+
+#include <std_msgs/MultiArrayLayout.h>
+#include <std_msgs/MultiArrayDimension.h>
+
+#include <std_msgs/UInt16MultiArray.h>//MultiArray.h>
+
+ros::NodeHandle nh;
+std_msgs::UInt16MultiArray US_msg;
+unsigned short data_space[8];
+
+ros::Publisher US_raw_pub("US_raw", &US_msg);
+
 #define echoPin 2                                     // Pin 2 Echo input
 #define intID 0                                       // Interrupt id for echo pulse
 
@@ -7,7 +20,6 @@ volatile long echo_start = 0;                         // Records start of echo p
 volatile long echo_end = 0;                           // Records end of echo pulse
 volatile long echo_duration = 0;                      // Duration - difference between end and start
 
-unsigned int values[8];
 int lastRead;
 
 void setup() 
@@ -19,7 +31,12 @@ void setup()
   
   attachInterrupt(intID, echo_interrupt, CHANGE);  // Attach interrupt to the sensor echo input
 
-  Serial.begin(9600);
+  nh.getHardware()->setBaud(57600);
+  nh.initNode();
+  US_msg.data_length = 8;
+  US_msg.data = data_space; // allocate space for data
+  
+  nh.advertise(US_raw_pub);
 }
 
 void loop()
@@ -31,19 +48,15 @@ void loop()
     
     if (echo_duration != lastRead)
     {
-      values[i] = echo_duration;
+      US_msg.data[i] = echo_duration;
       lastRead = echo_duration;
     }
     else // did not receive new pulse
-      values[i] = -1;
+      US_msg.data[i] = -1;
   }
   
-  for (int i = 0; i < 8; i++)
-  {
-    Serial.print(values[i]);
-    Serial.print("\t");
-  }
-  Serial.print("\n");
+  US_raw_pub.publish( &US_msg );
+  nh.spinOnce(); // necessary to establish link
 }
 
 
