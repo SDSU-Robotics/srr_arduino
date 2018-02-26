@@ -1,2 +1,2 @@
 # srr_arduino
-Code for the arduino onbaord the search and rescue rover. Handles ultrasonic sesnor readings.
+Code for the arduinos onbaord the search and rescue rover. Handles ultrasonic sesnor readings and encoder counting.
