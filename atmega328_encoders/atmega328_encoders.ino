@@ -1,5 +1,6 @@
 #include <Wire.h>
 
+//#define DEBUG_REQUEST
 //#define DEBUG
 #ifdef DEBUG
   #define BAUD 115200
@@ -10,7 +11,8 @@
   #define dbPrintln(x)
 #endif
 
-#define I2C_ADDRESS 40
+#define I2C_ADDRESS 0x28
+#define ENC_COUNT 6       // Number of encoders
 
 const int QEM [16] = {0,-1,1,0,1,0,0,-1,-1,0,0,1,0,1,-1,0};
 
@@ -52,21 +54,21 @@ ISR(PCINT0_vect) { updateCounts(); }
 ISR(PCINT2_vect) { updateCounts(); }
 
 void loop() {
-//    if (millis() - lastCount > 500) {
-//      dbPrint("Counts: ");
-//      dbPrint(counts[5]);
-//      dbPrint(",");
-//      dbPrint(counts[4]);
-//      dbPrint(",");
-//      dbPrint(counts[3]);
-//      dbPrint(",");
-//      dbPrint(counts[2]);
-//      dbPrint(",");
-//      dbPrint(counts[1]);
-//      dbPrint(",");
-//      dbPrintln(counts[0]);
-//      lastCount = millis();
-//    }
+    if (millis() - lastCount > 500) {
+      dbPrint("Counts: ");
+      dbPrint(counts[5]);
+      dbPrint(",");
+      dbPrint(counts[4]);
+      dbPrint(",");
+      dbPrint(counts[3]);
+      dbPrint(",");
+      dbPrint(counts[2]);
+      dbPrint(",");
+      dbPrint(counts[1]);
+      dbPrint(",");
+      dbPrintln(counts[0]);
+      lastCount = millis();
+    }
 }
 
 // shared ISR for PCINT0 and PCINT1
@@ -88,32 +90,68 @@ void updateCounts()
   lastRead = newRead;
 }
 
+// If we are debugging the request, use a generic request event
+#ifdef DEBUG_REQUEST
 void requestEvent()
 {
   byte data[4];
+  data[0] = 0xF0;
+  data[1] = 0x0F;
+  data[2] = 0xF0;
+  data[3] = 0x0F;
+  Wire.write(data, 4);
+}
+
+// If we aren't debugging, use the regular request event
+#else
+void requestEvent()
+{
   int32_t value;
+  byte sendBuffer[ENC_COUNT*sizeof(value)];
   
-  for (int i = 0; i < 6; i++)
+  for (int i = 0; i < ENC_COUNT*sizeof(value); i++)
   {
     value = counts[i];
+
+    /*
+     * Just because I'm obnoxious, there is another way to convert
+     * the counts array to an array of bytes. This would, however
+     * be potentially dangerous since it relies on the compiler
+     * acting in a certain way. Anyways, the way to do it would be
+     * something like this:
+     * int36_t counts[6];
+     * ... Counts gets filled somewhere ... 
+     * uint8_t* value;
+     * value = &counts;
+     * Now, value points to the counts array and we could use the 
+     * Wire.write command to send 24 bytes. This may not work
+     * because the compiler might see this as unsafe (which it is)
+     * since we never defined the memory space available to the 
+     * value pointer. More of food for thought than something that
+     * should actually be implemented. Also, depending on whether
+     * data is stored as big or little endian, the data may come
+     * out mixed up.
+     */
   
-    // put value into 4 byte array
-    data[0] = (value >> 24) & 0xFF;
-    data[1] = (value >> 16) & 0xFF;
-    data[2] = (value >> 8) & 0xFF;
-    data[3] = value & 0xFF;
-  
-    // write 4 bytes of data to I2C
-    Wire.write(data, 4);
-    dbPrint("Data[");
-    dbPrint(i);
-    dbPrint("]: ");
-    dbPrint(data[3]);
-    dbPrint(",");
-    dbPrint(data[2]);
-    dbPrint(",");
-    dbPrint(data[1]);
-    dbPrint(",");
-    dbPrintln(data[0]);
+    // Put value into a 24 byte array
+    sendBuffer[i*4+0] = (value >> 24) & 0xFF;
+    sendBuffer[i*4+1] = (value >> 16) & 0xFF;
+    sendBuffer[i*4+2] = (value >> 8) & 0xFF;
+    sendBuffer[i*4+3] = value & 0xFF;
   }
+
+  //Write the buffer to the I2C line
+  Wire.write(sendBuffer, ENC_COUNT*sizeof(value));
+
+  // If debugging, also print the data to serial
+  #ifdef DEBUG
+    for (int i = 0; i < ENC_COUNT*sizeof(value); i++) 
+    {
+      dbPrint("Data[");
+      dbPrint(i);
+      dbPrint("]: ");
+      dbPrintln(sendBuffer[i]);
+    }
+  #endif
 }
+#endif
